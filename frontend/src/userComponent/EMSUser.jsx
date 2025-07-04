@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { database } from "../../firebaseConfig/firebase";
+import { ref, onValue, query, limitToLast, limitToFirst } from "firebase/database";
 import Header from "./Navbar";
 import { Line, Bar } from "react-chartjs-2";
 import {
@@ -22,8 +24,8 @@ ChartJS.register(
   Legend,
   Tooltip
 );
-import html2canvas from 'html2canvas';
-import jsPDF from 'jspdf'
+import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
 // Helper functions to generate random numbers
 const getRandom = (min, max) =>
   parseFloat((Math.random() * (max - min) + min).toFixed(2));
@@ -128,7 +130,6 @@ const EpsilonEMS = () => {
   const [currentReading, setCurrentReading] = useState(0.75);
   const [voltageReading, setVoltageReading] = useState(217);
   const [powerReading, setPowerReading] = useState(162);
-
   const handleExportPdf = () => {
     // Select the main content area you want to export
     // You might need to adjust this selector based on your HTML structure
@@ -140,6 +141,7 @@ const EpsilonEMS = () => {
       return;
     }
 
+   
     // Temporarily hide elements you don't want in the PDF (like the header or modals)
     // Or you can create a specific printable layout via CSS media queries.
     // For simplicity, we'll aim for the main content block.
@@ -315,18 +317,6 @@ const EpsilonEMS = () => {
   // This useEffect will now ONLY update the live metrics (Current, Voltage, Power).
   // Chart data (bar and cost) will be fixed per timeframe selection via useMemo.
   useEffect(() => {
-    const updateLiveMetricsOnly = () => {
-      setCurrentReading(getRandom(0.5, 1.0));
-      setVoltageReading(getRandomInt(210, 240));
-      setPowerReading(getRandomInt(100, 250));
-    };
-
-    const interval = setInterval(updateLiveMetricsOnly, 5000);
-
-    return () => clearInterval(interval);
-  }, []); // Empty dependency array: runs once on mount, cleans up on unmount
-
-  useEffect(() => {
     const userString = localStorage.getItem("user");
     if (userString) {
       try {
@@ -343,9 +333,29 @@ const EpsilonEMS = () => {
     }
   }, []);
 
+  // Fetch the latest current, voltage, and power from Firebase Realtime Database and update the readings in real time.
+  useEffect(() => {
+    // Listen for the first (latest) reading from Firebase
+    const readingsRef = ref(database, "user0001/readings");
+    // Get only the first reading (the most recent one, assuming push keys are time-ordered)
+    const firstReadingQuery = query(readingsRef, limitToFirst(1));
+    const unsubscribe = onValue(firstReadingQuery, (snapshot) => {
+      let latest = null;
+      snapshot.forEach((child) => {
+        latest = child.val();
+      });
+      if (latest) {
+        setCurrentReading(latest.current || 0);
+        setVoltageReading(latest.voltage || 0);
+        setPowerReading(latest.power || 0);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   return (
     <>
-      <Header onExportPdf={handleExportPdf}/>
+      <Header onExportPdf={handleExportPdf} />
       <Modal
         isOpen={isServiceInactiveModalOpen}
         shouldCloseOnOverlayClick={false}
@@ -654,7 +664,7 @@ const EpsilonEMS = () => {
                     <div className="p-3 border rounded">
                       <p className="text-muted mb-1">Monthly Estimate</p>
                       <h4 className="mb-0">
-                       PKR 
+                        PKR
                         {timeframe === "24h"
                           ? getRandom(80, 100).toFixed(2)
                           : timeframe === "week"

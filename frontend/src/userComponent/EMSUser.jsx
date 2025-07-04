@@ -335,8 +335,21 @@ const EpsilonEMS = () => {
 
   // Fetch the latest current, voltage, and power from Firebase Realtime Database and update the readings in real time.
   useEffect(() => {
+    // Get userId from localStorage
+    const userString = localStorage.getItem("user");
+    let userId = "user0001";
+    if (userString) {
+      try {
+        const parsedUser = JSON.parse(userString);
+        if (parsedUser.UserId) {
+          userId = parsedUser.UserId;
+        }
+      } catch (error) {
+        console.error("Failed to parse user data from localStorage for userId:", error);
+      }
+    }
     // Listen for the first (latest) reading from Firebase
-    const readingsRef = ref(database, "user0001/readings");
+    const readingsRef = ref(database, `${userId}/readings`);
     // Get only the first reading (the most recent one, assuming push keys are time-ordered)
     const firstReadingQuery = query(readingsRef, limitToFirst(1));
     const unsubscribe = onValue(firstReadingQuery, (snapshot) => {

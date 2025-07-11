@@ -191,7 +191,9 @@ export default function Dashboard() {
     e.preventDefault();
 
     let userRooms = [];
-    if (selectedService === "EMS (IR)") {
+    if (selectedService === "IR") {
+      userRooms = rooms;
+    } else if (selectedService === "EMS (IR)") {
       userRooms = rooms;
     } else if (selectedService === "Automation") {
       userRooms = automationRooms;
@@ -564,6 +566,59 @@ export default function Dashboard() {
       return (
         // Only show "Add Room" button (Image 1)
         null
+      );
+    }
+    // IR (Image 2)
+    if (selectedService === "IR") {
+      return (
+        <>
+          <h5 style={{ marginTop: 24 }}>Add Room Details</h5>
+          <Form.Group style={{ display: "inline-block" }} className="mb-3 w-50">
+            <Form.Label>Room Name:</Form.Label>
+            <Form.Control
+              type="text"
+              placeholder="Enter room name"
+              value={roomName}
+              onChange={(e) => setRoomName(e.target.value)}
+            />
+          </Form.Group>
+          {/* Render added rooms */}
+          <div style={{ marginTop: 16 }}>
+            {rooms.map((room, idx) => (
+              <div
+                key={idx}
+                style={{
+                  background: "#e0e0e0",
+                  borderRadius: "10px",
+                  padding: "8px 16px",
+                  marginBottom: "8px",
+                  display: "inline-block",
+                }}
+              >
+                {room.roomName}
+              </div>
+            ))}
+          </div>
+          <button
+            variant="primary"
+            style={{
+              display: "block",
+              backgroundColor: "#007bff",
+              color: "white",
+              border: "none",
+              padding: "0.6rem 1.5rem",
+              borderRadius: "999px",
+              fontWeight: "bold",
+              fontSize: "1rem",
+              cursor: "pointer",
+              marginTop: 24,
+            }}
+            type="button"
+            onClick={handleAddRoomEMSIR}
+          >
+            Add Room
+          </button>
+        </>
       );
     }
     // EMS (IR) (Image 2)
@@ -1471,6 +1526,7 @@ export default function Dashboard() {
                   }}
                 >
                   <option value="EMS">EMS</option>
+                  <option value="IR">IR</option>
                   <option value="EMS (IR)">EMS (IR)</option>
                   <option value="Automation">Automation</option>
                   <option value="Automation(HD)">Automation(HD)</option>
@@ -1497,7 +1553,7 @@ export default function Dashboard() {
               </Form.Group>
 
               {/* Show fields based on selected service */}
-              {selectedService === "EMS" ? (
+              {selectedService === "EMS" || selectedService === "IR" ? (
                 renderRoomFields()
               ) : showRoomField ? (
                 renderRoomFields()
@@ -1517,7 +1573,7 @@ export default function Dashboard() {
                     marginRight: 10,
                   }}
                 >
-                  {selectedService === "EMS" ? "No Details" : "Show Details"}
+                  {selectedService === "EMS" || selectedService === "IR" ? "No Details" : "Show Details"}
                 </button>
               )}
               <button

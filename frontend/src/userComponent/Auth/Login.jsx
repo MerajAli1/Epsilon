@@ -48,6 +48,9 @@ const LoginPage = () => {
           case "Automation(HD)":
             navigate("/automationhd");
             break;
+          case "IR":
+            navigate("/ir");
+            break;
         }
       } else {
         alert("Invalid login response.");

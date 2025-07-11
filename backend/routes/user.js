@@ -22,6 +22,8 @@ const {
   changePassword,
   changeUserStatus,
   deleteUser,
+  unitsNotification,
+  getUnitsNotification,
 } = require("../controller/user");
 
 function authenticateToken(req, res, next) {
@@ -53,6 +55,10 @@ router.route("/updateServiceStatus").post(updateServiceStatus);
 router.route("/changePassword").post(changePassword);
 router.route("/changeStatus").post(changeUserStatus);
 router.route("/deleteUser").post(deleteUser);
+
+router.route("/unitsNotification").post(unitsNotification);
+
+router.route("/getUnitsNotification").get(getUnitsNotification);
 
 // router.route("/SendRepeatToken").post(handleRepeatTokenSend);
 // router.route("/verifyToken").post(VerifyToken);

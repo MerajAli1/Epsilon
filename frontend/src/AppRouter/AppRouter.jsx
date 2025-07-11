@@ -14,6 +14,7 @@ import AutomationHD from "../userComponent/AutomationHD";
 import Details from "../userComponent/Details";
 import ProtectedRoute from "./ProtectedRoute";
 import EMSforEMSIR from "../userComponent/EMSforEMSIR";
+import IR from "../userComponent/IR";
 const AppRouter = () => {
   return (
     <>
@@ -37,6 +38,7 @@ const AppRouter = () => {
             <Route path="/automation" element={<Automation />} />
 
             <Route path="/emsAndEmsir" element={<EmsAndEMSIR />} />
+            <Route path="/ir" element={<IR />} />
             <Route
               path="/emsAndEmsirAutomation"
               element={<EmsAndEmsIRAutomation />}

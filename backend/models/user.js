@@ -24,6 +24,11 @@ const userSchema = mongoose.Schema({
   ServiceStatus: {
     type: Boolean,
   },
+  unitsNotification:{
+    type: String,
+    default: 0,
+    required: true,
+  },
   PropertyType: {
     type: String,
     enum: ["Commercial", "Residential"],

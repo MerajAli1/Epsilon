@@ -12,6 +12,7 @@ const createUser = async (req, res) => {
       Service,
       Room,
       ServiceStatus,
+      unitsNotification,
       PropertyType, // <-- Added this line
     } = req.body;
 
@@ -25,6 +26,7 @@ const createUser = async (req, res) => {
       Service,
       Room, // should be an array of rooms, each containing devices
       ServiceStatus,
+      unitsNotification,
       PropertyType, // <-- And this line
     });
 
@@ -220,6 +222,63 @@ const deleteUser = async (req, res) => {
   }
 };
 
+const unitsNotification = async (req, res) => {
+  try {
+    const { UserId, unitsNotification } = req.body;
+    if (!UserId) {
+      return res.status(400).json({ message: "UserId is required" });
+    }
+    // Use $set to add or update the unitsNotification field
+    const user = await User.findOneAndUpdate(
+      { UserId: UserId }, // Find the user by ID
+      { unitsNotification }, // Use $set to update the field
+      { new: true } // Return the updated document
+    );
+    console.log("user", user);
+
+    if (!user) {
+      return res
+        .status(404)
+        .json({ message: `User with UserId '${UserId}' not found` });
+    }
+
+    return res.status(200).json({
+      message: "unitsNotification updated successfully",
+      user,
+    });
+  } catch (error) {
+    console.error("Error updating units notification:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+
+
+
+};
+
+const getUnitsNotification = async (req, res) => {
+  try {
+    const { UserId } = req.query;
+
+    if (!UserId) {
+      return res.status(400).json({ message: "UserId is required" });
+    }
+
+    const user = await User.findOne({ UserId });
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    return res.status(200).json({
+      message: "Units notification fetched successfully",
+      unitsNotification: user.unitsNotification,
+    });
+  }
+  catch (error) {
+    console.error("Error fetching units notification:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+}
+
+
 module.exports = {
   createUser,
   signin,
@@ -228,4 +287,6 @@ module.exports = {
   changePassword,
   changeUserStatus,
   deleteUser,
+  unitsNotification,
+  getUnitsNotification
 };

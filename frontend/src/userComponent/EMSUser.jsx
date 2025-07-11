@@ -1,6 +1,12 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { database } from "../../firebaseConfig/firebase";
-import { ref, onValue, query, limitToLast, limitToFirst } from "firebase/database";
+import {
+  ref,
+  onValue,
+  query,
+  limitToLast,
+  limitToFirst,
+} from "firebase/database";
 import Header from "./Navbar";
 import { Line, Bar } from "react-chartjs-2";
 import {
@@ -14,7 +20,7 @@ import {
   Tooltip,
 } from "chart.js";
 import Modal from "react-modal";
-
+import axios from "axios";
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -130,6 +136,7 @@ const EpsilonEMS = () => {
   const [currentReading, setCurrentReading] = useState(0.75);
   const [voltageReading, setVoltageReading] = useState(217);
   const [powerReading, setPowerReading] = useState(162);
+
   const handleExportPdf = () => {
     // Select the main content area you want to export
     // You might need to adjust this selector based on your HTML structure
@@ -141,7 +148,6 @@ const EpsilonEMS = () => {
       return;
     }
 
-   
     // Temporarily hide elements you don't want in the PDF (like the header or modals)
     // Or you can create a specific printable layout via CSS media queries.
     // For simplicity, we'll aim for the main content block.
@@ -325,6 +331,11 @@ const EpsilonEMS = () => {
         if (parsedUser.ServiceStatus === false) {
           setIsServiceInactiveModalOpen(true);
         }
+        
+        // Fetch and compare units notification on login
+        if (parsedUser.UserId) {
+          fetchAndCompareUnitsNotification(parsedUser.UserId);
+        }
       } catch (error) {
         console.error("Failed to parse user data from localStorage:", error);
       }
@@ -345,7 +356,10 @@ const EpsilonEMS = () => {
           userId = parsedUser.UserId;
         }
       } catch (error) {
-        console.error("Failed to parse user data from localStorage for userId:", error);
+        console.error(
+          "Failed to parse user data from localStorage for userId:",
+          error
+        );
       }
     }
     // Listen for the first (latest) reading from Firebase
@@ -365,6 +379,86 @@ const EpsilonEMS = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  // --- Units Notification API Integration ---
+  const units = 200; // Fixed variable for comparison
+  const [unitsNotificationValue, setUnitsNotificationValue] = useState("");
+  const [unitsNotificationMsg, setUnitsNotificationMsg] = useState("");
+  const [isUnitsNotificationModalOpen, setIsUnitsNotificationModalOpen] =
+    useState(false);
+  const [isUnitsThresholdModalOpen, setIsUnitsThresholdModalOpen] =
+    useState(false);
+  const [currentUnitsNotification, setCurrentUnitsNotification] = useState(0);
+
+  // Function to fetch and compare units notification
+  const fetchAndCompareUnitsNotification = async (UserId) => {
+    try {
+      const response = await axios.get(
+        `http://localhost:2000/api/user/getUnitsNotification?UserId=${UserId}`
+      );
+      console.log("Get units notification response:", response.data);
+      
+      const fetchedUnits = Number(response.data.unitsNotification);
+      setCurrentUnitsNotification(fetchedUnits);
+      
+      // Compare with fixed units variable
+      if (fetchedUnits > units) {
+        setIsUnitsThresholdModalOpen(true);
+      }
+    } catch (error) {
+      console.error("Error fetching units notification:", error);
+    }
+  };
+
+  const handleUnitsNotificationSubmit = async (e) => {
+    e.preventDefault();
+    const userString = localStorage.getItem("user");
+    let UserId = null;
+    if (userString) {
+      try {
+        const parsedUser = JSON.parse(userString);
+        UserId = parsedUser.UserId;
+      } catch (err) {
+        setUnitsNotificationMsg("User not found. Please login again.");
+        setIsUnitsNotificationModalOpen(true);
+        return;
+      }
+    }
+    if (!UserId) {
+      setUnitsNotificationMsg("User not found. Please login again.");
+      setIsUnitsNotificationModalOpen(true);
+      return;
+    }
+    // console.log(UserId, "Units Notification Value:");
+    const value = Number(unitsNotificationValue);
+    if (isNaN(value)) {
+      setUnitsNotificationMsg("Please enter a valid number.");
+      setIsUnitsNotificationModalOpen(true);
+      return;
+    }
+
+    try {
+      const res = await axios.post(
+        `http://localhost:2000/api/user/unitsNotification`,
+        {
+          UserId,
+          unitsNotification: value,
+        }
+      );
+      console.log("Units notification response:", res);
+
+      setUnitsNotificationMsg(
+        res.data.message || "Units notification updated successfully."
+      );
+    } catch (err) {
+      console.log("Error updating units notification:", err);
+
+      setUnitsNotificationMsg(
+        err.response?.data?.message || "Failed to update units notification."
+      );
+    }
+    setIsUnitsNotificationModalOpen(true);
+  };
 
   return (
     <>
@@ -426,334 +520,492 @@ const EpsilonEMS = () => {
         </button>
       </Modal>
 
+      {/* Units Notification Input */}
+      <Modal
+        isOpen={isUnitsNotificationModalOpen}
+        onRequestClose={() => setIsUnitsNotificationModalOpen(false)}
+        style={{
+          overlay: { backgroundColor: "rgba(0,0,0,0.7)", zIndex: 2000 },
+          content: {
+            top: "50%",
+            left: "50%",
+            right: "auto",
+            bottom: "auto",
+            marginRight: "-50%",
+            transform: "translate(-50%, -50%)",
+            width: "90%",
+            maxWidth: "400px",
+            padding: "2rem",
+            borderRadius: "10px",
+            textAlign: "center",
+          },
+        }}
+      >
+        <h4>Units Notification</h4>
+        <p>{unitsNotificationMsg}</p>
+        <button
+          className="btn btn-primary"
+          onClick={() => setIsUnitsNotificationModalOpen(false)}
+        >
+          OK
+        </button>
+      </Modal>
+
+      {/* Units Threshold Exceeded Modal */}
+      <Modal
+        isOpen={isUnitsThresholdModalOpen}
+        onRequestClose={() => setIsUnitsThresholdModalOpen(false)}
+        style={{
+          overlay: { backgroundColor: "rgba(0,0,0,0.7)", zIndex: 2000 },
+          content: {
+            top: "50%",
+            left: "50%",
+            right: "auto",
+            bottom: "auto",
+            marginRight: "-50%",
+            transform: "translate(-50%, -50%)",
+            width: "90%",
+            maxWidth: "400px",
+            padding: "2rem",
+            borderRadius: "10px",
+            textAlign: "center",
+          },
+        }}
+      >
+        <h4 style={{ color: "#dc3545" }}>Units Notification Exceeded</h4>
+        <p className="text-danger" style={{ fontSize: "1.2rem" }}>
+          Your usage has exceeded the set notification limit of {units} units.
+        </p>
+        <p className="text-muted">
+          Current usage: {currentUnitsNotification} units
+        </p>
+        <button
+          className="btn btn-danger"
+          onClick={() => setIsUnitsThresholdModalOpen(false)}
+        >
+          Acknowledge
+        </button>
+      </Modal>
+
+      {/* Units Threshold Warning Modal */}
+      <Modal
+        isOpen={isUnitsThresholdModalOpen}
+        onRequestClose={() => setIsUnitsThresholdModalOpen(false)}
+        style={{
+          overlay: { backgroundColor: "rgba(0,0,0,0.8)", zIndex: 2500 },
+          content: {
+            top: "50%",
+            left: "50%",
+            right: "auto",
+            bottom: "auto",
+            marginRight: "-50%",
+            transform: "translate(-50%, -50%)",
+            width: "90%",
+            maxWidth: "500px",
+            padding: "2rem",
+            borderRadius: "10px",
+            textAlign: "center",
+            border: "2px solid #dc3545",
+          },
+        }}
+      >
+        <div style={{ color: "#dc3545", marginBottom: "1rem" }}>
+          <i className="fas fa-exclamation-triangle" style={{ fontSize: "3rem" }}></i>
+        </div>
+        <h4 style={{ color: "#dc3545", marginBottom: "1rem" }}>
+          Units Threshold Exceeded!
+        </h4>
+        <p style={{ fontSize: "1.1rem", color: "#333", marginBottom: "1rem" }}>
+          Your current units notification is set to <strong>{currentUnitsNotification}</strong>, 
+          which exceeds the recommended limit of <strong>{units}</strong> units.
+        </p>
+        <p style={{ fontSize: "1rem", color: "#666", marginBottom: "1.5rem" }}>
+          Consider reducing your notification threshold to optimize energy management.
+        </p>
+        <div className="d-flex justify-content-center gap-3">
+          <button
+            className="btn btn-outline-secondary"
+            onClick={() => setIsUnitsThresholdModalOpen(false)}
+          >
+            Dismiss
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setIsUnitsThresholdModalOpen(false);
+              // Scroll to units notification input
+              document.getElementById('unitsNotificationInput')?.scrollIntoView({ behavior: 'smooth' });
+            }}
+          >
+            Adjust Settings
+          </button>
+        </div>
+      </Modal>
+
       <div
         id="dashboard-content"
         style={{ backgroundColor: "#f5f5f5", minHeight: "100vh" }}
       >
         <div className="container py-4">
-          <div className="text-success fw-bold mb-2">
-            ● Connected to Monitoring System
-          </div>
-          <div className="mb-2">
-            Logged in as: <span className="text-primary">{user?.Username}</span>
-          </div>
-          <div className="text-muted mb-4">
-            {new Date().toLocaleString("en-US", {
-              month: "long",
-              day: "numeric",
-              year: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true,
-            })}
-          </div>
-
-          <div className="row text-center mb-4">
-            <div className="col-md-4 mb-3">
-              <div
-                style={{ backgroundColor: "white" }}
-                className="border rounded p-3"
-              >
-                <div>Current</div>
-                <h3>
-                  {currentReading.toFixed(2)}{" "}
-                  <span className="text-muted">A</span>
-                </h3>
-              </div>
-            </div>
-            <div className="col-md-4 mb-3">
-              <div
-                style={{ backgroundColor: "white" }}
-                className="border rounded p-3"
-              >
-                <div>Voltage</div>
-                <h3>
-                  {voltageReading} <span className="text-muted">V</span>
-                </h3>
-              </div>
-            </div>
-            <div className="col-md-4 mb-3">
-              <div
-                style={{ backgroundColor: "white" }}
-                className="border rounded p-3"
-              >
-                <div>Power</div>
-                <h3 className="text-primary">
-                  {powerReading} <span className="text-muted">W</span>
-                </h3>
-              </div>
-            </div>
-          </div>
-
-          <div
-            style={{ backgroundColor: "white" }}
-            className="mb-3 p-5 rounded"
+          {/* Units Notification Input Field */}
+          <form
+            onSubmit={handleUnitsNotificationSubmit}
+            className="mb-4 d-flex align-items-center"
           >
-            <h5>Energy Consumption</h5>
-            <p className="text-muted">
-              Detailed view of your power consumption
-            </p>
-
-            <div className="d-flex mb-3">
-              <button
-                className={`btn ${
-                  activeView === "usage"
-                    ? "btn-outline-primary"
-                    : "btn-outline-secondary"
-                } me-2`}
-                onClick={() => setActiveView("usage")}
-              >
-                Usage (Watts)
-              </button>
-              <button
-                className={`btn ${
-                  activeView === "cost"
-                    ? "btn-outline-primary"
-                    : "btn-outline-secondary"
-                }`}
-                onClick={() => setActiveView("cost")}
-              >
-                Cost
-              </button>
+            <label
+              htmlFor="unitsNotificationInput"
+              className="me-2 mb-0 fw-bold"
+            >
+              Set Units Notification:
+            </label>
+            <input
+              id="unitsNotificationInput"
+              type="number"
+              min="0"
+              step="any"
+              value={unitsNotificationValue}
+              onChange={(e) => setUnitsNotificationValue(e.target.value)}
+              className="form-control me-2"
+              style={{ width: 120 }}
+              required
+            />
+            <button type="submit" className="btn btn-success">
+              Save
+            </button>
+          </form>
+          {/* ...existing code... */}
+          <div className="container py-4">
+            <div className="text-success fw-bold mb-2">
+              ● Connected to Monitoring System
+            </div>
+            <div className="mb-2">
+              Logged in as:{" "}
+              <span className="text-primary">{user?.Username}</span>
+            </div>
+            <div className="text-muted mb-4">
+              {new Date().toLocaleString("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true,
+              })}
             </div>
 
-            <div className="d-flex justify-content-end mb-2">
-              <button
-                className={`btn btn-sm ${
-                  timeframe === "24h" ? "btn-primary" : "btn-outline-secondary"
-                } me-1`}
-                onClick={() => setTimeframe("24h")}
-              >
-                24h
-              </button>
-              <button
-                className={`btn btn-sm ${
-                  timeframe === "week" ? "btn-primary" : "btn-outline-secondary"
-                } me-1`}
-                onClick={() => setTimeframe("week")}
-              >
-                Week
-              </button>
-              <button
-                className={`btn btn-sm ${
-                  timeframe === "month"
-                    ? "btn-primary"
-                    : "btn-outline-secondary"
-                }`}
-                onClick={() => setTimeframe("month")}
-              >
-                Month
-              </button>
-            </div>
-
-            {activeView === "usage" ? (
-              <div style={{ position: "relative" }}>
-                <Bar
-                  data={dynamicBarData}
-                  options={barOptions}
-                  style={{ width: "100%" }}
-                />
-              </div>
-            ) : (
-              <div>
-                <div className="mb-4">
-                  <div className="d-flex align-items-center mb-1">
-                    <div
-                      style={{
-                        width: "12px",
-                        height: "12px",
-                        backgroundColor: "#007bff",
-                        marginRight: "6px",
-                      }}
-                    ></div>
-                    <span className="text-muted small">Cost </span>
-                  </div>
+            <div className="row text-center mb-4">
+              <div className="col-md-4 mb-3">
+                <div
+                  style={{ backgroundColor: "white" }}
+                  className="border rounded p-3"
+                >
+                  <div>Current</div>
+                  <h3>
+                    {currentReading.toFixed(2)}{" "}
+                    <span className="text-muted">A</span>
+                  </h3>
                 </div>
-                <Bar data={dynamicCostData} options={costOptions} />
               </div>
-            )}
-          </div>
-
-          {/* Detailed Analysis Section */}
-          <div
-            style={{ backgroundColor: "white" }}
-            className="mb-3 p-4 rounded"
-          >
-            <h5 className="mb-3">Detailed Analysis</h5>
-
-            {/* Analysis Tabs */}
-            <div className="mb-4">
-              <div className="d-flex">
-                <button
-                  className={`btn ${
-                    activeAnalysisTab === "consumption"
-                      ? "btn-primary"
-                      : "btn-outline-secondary"
-                  } me-2 rounded-pill px-3`}
-                  onClick={() => setActiveAnalysisTab("consumption")}
+              <div className="col-md-4 mb-3">
+                <div
+                  style={{ backgroundColor: "white" }}
+                  className="border rounded p-3"
                 >
-                  Consumption
-                </button>
-                <button
-                  className={`btn ${
-                    activeAnalysisTab === "costs"
-                      ? "btn-primary"
-                      : "btn-outline-secondary"
-                  } me-2 rounded-pill px-3`}
-                  onClick={() => setActiveAnalysisTab("costs")}
+                  <div>Voltage</div>
+                  <h3>
+                    {voltageReading} <span className="text-muted">V</span>
+                  </h3>
+                </div>
+              </div>
+              <div className="col-md-4 mb-3">
+                <div
+                  style={{ backgroundColor: "white" }}
+                  className="border rounded p-3"
                 >
-                  Costs
-                </button>
-                <button
-                  className={`btn ${
-                    activeAnalysisTab === "insights"
-                      ? "btn-primary"
-                      : "btn-outline-secondary"
-                  } rounded-pill px-3`}
-                  onClick={() => setActiveAnalysisTab("insights")}
-                >
-                  Insights
-                </button>
+                  <div>Power</div>
+                  <h3 className="text-primary">
+                    {powerReading} <span className="text-muted">W</span>
+                  </h3>
+                </div>
               </div>
             </div>
 
-            {/* Consumption View */}
-            {activeAnalysisTab === "consumption" && (
-              <div>
-                <div className="row">
-                  <div className="col-md-4">
-                    <div className="p-3 border rounded">
-                      <p className="text-muted mb-1">Daily Average</p>
-                      <h4 className="mb-0">
-                        {timeframe === "24h"
-                          ? getRandom(2.5, 4.0).toFixed(1) + " kWh"
-                          : timeframe === "week"
-                          ? getRandom(18, 25).toFixed(1) + " kWh"
-                          : getRandom(70, 100).toFixed(1) + " kWh"}
-                      </h4>
-                      <small className="text-muted">
-                        {timeframe === "24h" ? "Today" : "Last 7 days"}
-                      </small>
-                    </div>
-                  </div>
-                  <div className="col-md-4">
-                    <div className="p-3 border rounded">
-                      <p className="text-muted mb-1">Peak Usage</p>
-                      <h4 className="mb-0">
-                        {timeframe === "24h"
-                          ? getRandomInt(650, 800) + " W"
-                          : timeframe === "week"
-                          ? getRandomInt(4000, 6000) + " W"
-                          : getRandomInt(15000, 20000) + " W"}
-                      </h4>
-                      <small className="text-muted">
-                        {timeframe === "24h" ? "Today at 6:23 PM" : "Last week"}
-                      </small>
-                    </div>
-                  </div>
-                  <div className="col-md-4">
-                    <div className="p-3 border rounded">
-                      <p className="text-muted mb-1">Power Factor</p>
-                      <h4 className="mb-0">0.92</h4>
-                      <small className="text-muted">Good efficiency</small>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <p>
-                    Your electricity usage pattern shows highest consumption
-                    during evening hours (6-9 PM). Consider shifting some
-                    activities to off-peak hours to optimize energy usage.
-                  </p>
-                </div>
-              </div>
-            )}
+            <div
+              style={{ backgroundColor: "white" }}
+              className="mb-3 p-5 rounded"
+            >
+              <h5>Energy Consumption</h5>
+              <p className="text-muted">
+                Detailed view of your power consumption
+              </p>
 
-            {/* Costs View */}
-            {activeAnalysisTab === "costs" && (
-              <div>
-                <div className="row">
-                  <div className="col-md-4">
-                    <div className="p-3 border rounded">
-                      <p className="text-muted mb-1">Monthly Estimate</p>
-                      <h4 className="mb-0">
-                        PKR
-                        {timeframe === "24h"
-                          ? getRandom(80, 100).toFixed(2)
-                          : timeframe === "week"
-                          ? getRandom(20, 35).toFixed(2) // Daily estimate for week view
-                          : getRandom(80, 120).toFixed(2)}{" "}
-                      </h4>
-                      <small className="text-muted">
-                        Based on current usage
-                      </small>
-                    </div>
-                  </div>
-                  <div className="col-md-4">
-                    <div className="p-3 border rounded">
-                      <p className="text-muted mb-1">Daily Average</p>
-                      <h4 className="mb-0">
-                        PKR
-                        {timeframe === "24h"
-                          ? getRandom(2.5, 3.5).toFixed(2)
-                          : timeframe === "week"
-                          ? getRandom(2.0, 5.0).toFixed(2) // Daily average for week view
-                          : getRandom(10.0, 15.0).toFixed(2)}{" "}
-                      </h4>
-                      <small className="text-muted">Last 7 days</small>
-                    </div>
-                  </div>
-                  <div className="col-md-4">
-                    <div className="p-3 border rounded">
-                      <p className="text-muted mb-1">Rate</p>
-                      <h4 className="mb-0">PKR 0.15/kWh</h4>
-                      <small className="text-muted">Standard rate</small>
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <p>
-                    Your current electricity rate is PKR 0.15/kWh. Based on your
-                    usage patterns, you could save approximately PKR 12.40 per
-                    month by optimizing usage during peak hours.
-                  </p>
-                </div>
+              <div className="d-flex mb-3">
+                <button
+                  className={`btn ${
+                    activeView === "usage"
+                      ? "btn-outline-primary"
+                      : "btn-outline-secondary"
+                  } me-2`}
+                  onClick={() => setActiveView("usage")}
+                >
+                  Usage (Watts)
+                </button>
+                <button
+                  className={`btn ${
+                    activeView === "cost"
+                      ? "btn-outline-primary"
+                      : "btn-outline-secondary"
+                  }`}
+                  onClick={() => setActiveView("cost")}
+                >
+                  Cost
+                </button>
               </div>
-            )}
 
-            {/* Insights View */}
-            {activeAnalysisTab === "insights" && (
-              <div>
-                <div className="mb-4">
-                  <h6>Energy Saving Tips</h6>
-                  <p className="text-muted small">
-                    Based on your consumption patterns, here are some
-                    personalized recommendations:
-                  </p>
-                  <ul>
-                    <li>
-                      Consider using smart power strips for devices with standby
-                      power consumption
-                    </li>
-                    <li>
-                      Your peak usage is between 6-9 PM, try to shift high-power
-                      activities
-                    </li>
-                    <li>
-                      There's significant constant power draw at night, check
-                      for always-on devices
-                    </li>
-                  </ul>
+              <div className="d-flex justify-content-end mb-2">
+                <button
+                  className={`btn btn-sm ${
+                    timeframe === "24h"
+                      ? "btn-primary"
+                      : "btn-outline-secondary"
+                  } me-1`}
+                  onClick={() => setTimeframe("24h")}
+                >
+                  24h
+                </button>
+                <button
+                  className={`btn btn-sm ${
+                    timeframe === "week"
+                      ? "btn-primary"
+                      : "btn-outline-secondary"
+                  } me-1`}
+                  onClick={() => setTimeframe("week")}
+                >
+                  Week
+                </button>
+                <button
+                  className={`btn btn-sm ${
+                    timeframe === "month"
+                      ? "btn-primary"
+                      : "btn-outline-secondary"
+                  }`}
+                  onClick={() => setTimeframe("month")}
+                >
+                  Month
+                </button>
+              </div>
+
+              {activeView === "usage" ? (
+                <div style={{ position: "relative" }}>
+                  <Bar
+                    data={dynamicBarData}
+                    options={barOptions}
+                    style={{ width: "100%" }}
+                  />
                 </div>
+              ) : (
                 <div>
-                  <h6>Anomaly Detection</h6>
-                  <p className="text-muted">
-                    No significant anomalies detected in your recent consumption
-                    patterns.
-                  </p>
+                  <div className="mb-4">
+                    <div className="d-flex align-items-center mb-1">
+                      <div
+                        style={{
+                          width: "12px",
+                          height: "12px",
+                          backgroundColor: "#007bff",
+                          marginRight: "6px",
+                        }}
+                      ></div>
+                      <span className="text-muted small">Cost </span>
+                    </div>
+                  </div>
+                  <Bar data={dynamicCostData} options={costOptions} />
+                </div>
+              )}
+            </div>
+
+            {/* Detailed Analysis Section */}
+            <div
+              style={{ backgroundColor: "white" }}
+              className="mb-3 p-4 rounded"
+            >
+              <h5 className="mb-3">Detailed Analysis</h5>
+
+              {/* Analysis Tabs */}
+              <div className="mb-4">
+                <div className="d-flex">
+                  <button
+                    className={`btn ${
+                      activeAnalysisTab === "consumption"
+                        ? "btn-primary"
+                        : "btn-outline-secondary"
+                    } me-2 rounded-pill px-3`}
+                    onClick={() => setActiveAnalysisTab("consumption")}
+                  >
+                    Consumption
+                  </button>
+                  <button
+                    className={`btn ${
+                      activeAnalysisTab === "costs"
+                        ? "btn-primary"
+                        : "btn-outline-secondary"
+                    } me-2 rounded-pill px-3`}
+                    onClick={() => setActiveAnalysisTab("costs")}
+                  >
+                    Costs
+                  </button>
+                  <button
+                    className={`btn ${
+                      activeAnalysisTab === "insights"
+                        ? "btn-primary"
+                        : "btn-outline-secondary"
+                    } rounded-pill px-3`}
+                    onClick={() => setActiveAnalysisTab("insights")}
+                  >
+                    Insights
+                  </button>
                 </div>
               </div>
-            )}
+
+              {/* Consumption View */}
+              {activeAnalysisTab === "consumption" && (
+                <div>
+                  <div className="row">
+                    <div className="col-md-4">
+                      <div className="p-3 border rounded">
+                        <p className="text-muted mb-1">Daily Average</p>
+                        <h4 className="mb-0">
+                          {timeframe === "24h"
+                            ? getRandom(2.5, 4.0).toFixed(1) + " kWh"
+                            : timeframe === "week"
+                            ? getRandom(18, 25).toFixed(1) + " kWh"
+                            : getRandom(70, 100).toFixed(1) + " kWh"}
+                        </h4>
+                        <small className="text-muted">
+                          {timeframe === "24h" ? "Today" : "Last 7 days"}
+                        </small>
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="p-3 border rounded">
+                        <p className="text-muted mb-1">Peak Usage</p>
+                        <h4 className="mb-0">
+                          {timeframe === "24h"
+                            ? getRandomInt(650, 800) + " W"
+                            : timeframe === "week"
+                            ? getRandomInt(4000, 6000) + " W"
+                            : getRandomInt(15000, 20000) + " W"}
+                        </h4>
+                        <small className="text-muted">
+                          {timeframe === "24h"
+                            ? "Today at 6:23 PM"
+                            : "Last week"}
+                        </small>
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="p-3 border rounded">
+                        <p className="text-muted mb-1">Power Factor</p>
+                        <h4 className="mb-0">0.92</h4>
+                        <small className="text-muted">Good efficiency</small>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <p>
+                      Your electricity usage pattern shows highest consumption
+                      during evening hours (6-9 PM). Consider shifting some
+                      activities to off-peak hours to optimize energy usage.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Costs View */}
+              {activeAnalysisTab === "costs" && (
+                <div>
+                  <div className="row">
+                    <div className="col-md-4">
+                      <div className="p-3 border rounded">
+                        <p className="text-muted mb-1">Monthly Estimate</p>
+                        <h4 className="mb-0">
+                          PKR
+                          {timeframe === "24h"
+                            ? getRandom(80, 100).toFixed(2)
+                            : timeframe === "week"
+                            ? getRandom(20, 35).toFixed(2) // Daily estimate for week view
+                            : getRandom(80, 120).toFixed(2)}{" "}
+                        </h4>
+                        <small className="text-muted">
+                          Based on current usage
+                        </small>
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="p-3 border rounded">
+                        <p className="text-muted mb-1">Daily Average</p>
+                        <h4 className="mb-0">
+                          PKR
+                          {timeframe === "24h"
+                            ? getRandom(2.5, 3.5).toFixed(2)
+                            : timeframe === "week"
+                            ? getRandom(2.0, 5.0).toFixed(2) // Daily average for week view
+                            : getRandom(10.0, 15.0).toFixed(2)}{" "}
+                        </h4>
+                        <small className="text-muted">Last 7 days</small>
+                      </div>
+                    </div>
+                    <div className="col-md-4">
+                      <div className="p-3 border rounded">
+                        <p className="text-muted mb-1">Rate</p>
+                        <h4 className="mb-0">PKR 0.15/kWh</h4>
+                        <small className="text-muted">Standard rate</small>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-4">
+                    <p>
+                      Your current electricity rate is PKR 0.15/kWh. Based on
+                      your usage patterns, you could save approximately PKR
+                      12.40 per month by optimizing usage during peak hours.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Insights View */}
+              {activeAnalysisTab === "insights" && (
+                <div>
+                  <div className="mb-4">
+                    <h6>Energy Saving Tips</h6>
+                    <p className="text-muted small">
+                      Based on your consumption patterns, here are some
+                      personalized recommendations:
+                    </p>
+                    <ul>
+                      <li>
+                        Consider using smart power strips for devices with
+                        standby power consumption
+                      </li>
+                      <li>
+                        Your peak usage is between 6-9 PM, try to shift
+                        high-power activities
+                      </li>
+                      <li>
+                        There's significant constant power draw at night, check
+                        for always-on devices
+                      </li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h6>Anomaly Detection</h6>
+                    <p className="text-muted">
+                      No significant anomalies detected in your recent
+                      consumption patterns.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

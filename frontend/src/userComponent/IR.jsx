@@ -758,7 +758,7 @@ const IR = () => {
               </div>
             </div>
 
-            {/* Right side - Rooms */}
+            {/* Right side - Room */}
             <div className="col-12 col-md-6 col-lg-4">
               <div
                 style={{ backgroundColor: "white" }}

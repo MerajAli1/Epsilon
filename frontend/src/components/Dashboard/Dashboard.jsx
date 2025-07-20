@@ -5,6 +5,8 @@ import Header from "../Dashboard/DashboardNavbar";
 import axios from "axios";
 import * as XLSX from "xlsx"; // For Excel file manipulation
 import { saveAs } from "file-saver"; // For saving the file
+import { database } from "../../../firebaseConfig/firebase"; // Import Firebase database
+import { ref, set, push } from "firebase/database"; // Import Firebase functions
 // Added mobile responsiveness to the Dashboard comp
 // onent
 export default function Dashboard() {
@@ -185,6 +187,52 @@ export default function Dashboard() {
       closeDeleteModal(); // Always close the modal after the attempt
     }
   };
+  
+  // Function to save automation data to Firebase
+  const saveAutomationToFirebase = async (userId, automationData, serviceType) => {
+    try {
+      console.log("Attempting to save to Firebase:", {
+        userId,
+        serviceType,
+        roomCount: automationData ? automationData.length : 0,
+        automationData
+      });
+
+      // Create a reference to the user's automation data in Firebase
+      const userAutomationRef = ref(database, `${userId}`);
+      
+      // Structure the data as {userId} -> rooms -> {roomName} -> roomName array & devices array
+      const firebaseData = {
+        rooms: {}
+      };
+      
+      // Process rooms and devices based on the data structure
+      if (automationData && automationData.length > 0) {
+        automationData.forEach((room, index) => {
+          const roomKey = room.roomName || `room_${index}`;
+          firebaseData.rooms[roomKey] = {
+            roomName: [
+              { name: room.roomName }
+            ],
+            devices: room.devices || [],
+            createdAt: new Date().toISOString()
+          };
+        });
+      }
+      
+      console.log("Firebase data structure:", firebaseData);
+      
+      // Save to Firebase
+      await set(userAutomationRef, firebaseData);
+      console.log(`${serviceType} data saved to Firebase successfully for user: ${userId}`);
+      
+      return true;
+    } catch (error) {
+      console.error("Error saving automation data to Firebase:", error);
+      throw error;
+    }
+  };
+  
   // ...existing code...
   // ...existing code...
   const handleCreateUser = async (e) => {
@@ -235,9 +283,36 @@ export default function Dashboard() {
         );
 
         if (response.status === 201) {
+          // Save automation data to Firebase if service includes automation
+          if (selectedService.includes("Automation")) {
+            try {
+              await saveAutomationToFirebase(UserId, userRooms, selectedService);
+              console.log("Automation data synced to Firebase");
+            } catch (firebaseError) {
+              console.error("Failed to save automation data to Firebase:", firebaseError);
+              // Don't show error to user as main user creation was successful
+            }
+          }
+          
           alert("User created successfully!");
           setIsModalOpen(false);
           setStep("personalDetails");
+          
+          // Reset all room states after successful creation
+          setRooms([]);
+          setAutomationRooms([]);
+          setAutomationHDRooms([]);
+          setEmsAutomationRooms([]);
+          setEmsIRAutomationRooms([]);
+          setEmsEmsIRAutomationRooms([]);
+          setEmsEmsIRRooms([]);
+          setCurrentRoomName("");
+          setCurrentDevices([]);
+          setUsername("");
+          setCnic("");
+          setAddress("");
+          setUserId("");
+          setPhone("");
         } else {
           alert(response.data.message || "Failed to create user");
         }

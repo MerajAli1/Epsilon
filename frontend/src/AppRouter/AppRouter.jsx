@@ -31,19 +31,51 @@ const AppRouter = () => {
           />
           <Route path="/changePassword" element={<ChangePassword />} />
 
-          <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/emsuser" element={<EMSUser />} />
-            <Route path="/emsuserforemsir" element={<EMSforEMSIR />} />
-            <Route path="/emsir" element={<EMSIR />} />
-            <Route path="/automation" element={<Automation />} />
-
-            <Route path="/emsAndEmsir" element={<EmsAndEMSIR />} />
-            <Route path="/ir" element={<IR />} />
-            <Route
-              path="/emsAndEmsirAutomation"
-              element={<EmsAndEmsIRAutomation />}
-            />
-            <Route path="/automationhd" element={<AutomationHD />} />
+          <Route path="/dashboard" element={
+            // <ProtectedRoute>
+              <Dashboard />
+            // </ProtectedRoute>
+          } />
+          <Route path="/emsuser" element={
+            <ProtectedRoute>
+              <EMSUser />
+            </ProtectedRoute>
+          } />
+          <Route path="/emsuserforemsir" element={
+            <ProtectedRoute>
+              <EMSforEMSIR />
+            </ProtectedRoute>
+          } />
+          <Route path="/emsir" element={
+            <ProtectedRoute>
+              <EMSIR />
+            </ProtectedRoute>
+          } />
+          <Route path="/automation" element={
+            <ProtectedRoute>
+              <Automation />
+            </ProtectedRoute>
+          } />
+          <Route path="/emsAndEmsir" element={
+            <ProtectedRoute>
+              <EmsAndEMSIR />
+            </ProtectedRoute>
+          } />
+          <Route path="/ir" element={
+            <ProtectedRoute>
+              <IR />
+            </ProtectedRoute>
+          } />
+          <Route path="/emsAndEmsirAutomation" element={
+            <ProtectedRoute>
+              <EmsAndEmsIRAutomation />
+            </ProtectedRoute>
+          } />
+          <Route path="/automationhd" element={
+            <ProtectedRoute>
+              <AutomationHD />
+            </ProtectedRoute>
+          } />
         </Routes>
         {/* automationhd */}
         {/* ems+emsir */}
